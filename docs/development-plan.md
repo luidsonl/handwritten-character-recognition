@@ -1,162 +1,282 @@
 
 # Development Plan: Client-Side EMNIST Character Recognition Web App
 
-## Phase 1: Model Training & Conversion (Python Environment)
-The objective of this phase is to train the required Convolutional Neural Network (CNN) architecture and export it into a format that web browsers can execute natively.
+> A proof-of-concept (POC) system for intelligent handwritten word recognition.
+> The user writes a word on a canvas and the system reconstructs it as digital text.
 
-* **Step 1.1: Train the CNN**
-    * [cite_start]Load the `balanced` split of the EMNIST dataset (47 classes)[cite: 38, 81].
-    * [cite_start]Implement the exact sequential architecture required[cite: 59, 61]:
-        * [cite_start]Input layer: `(28, 28, 1)`[cite: 63, 73].
-        * [cite_start]Block 1: `Conv2D` (32 filters, 5x5 kernel, `tanh`, `same` padding) + `MaxPooling2D` (stride = 2)[cite: 62, 63, 64].
-        * [cite_start]Block 2: `Conv2D` (48 filters, 5x5 kernel, `tanh`, `same` padding) + `MaxPooling2D` (stride = 2)[cite: 65, 66].
-        * [cite_start]Block 3: `Conv2D` (64 filters, 5x5 kernel, `tanh`, `same` padding) + `Flatten()`[cite: 67, 68].
-        * [cite_start]Dense Layers: `Dense(512, tanh)` -> `Dense(84, tanh)` -> `Dense(47, softmax)`[cite: 72].
-* **Step 1.2: Model Evaluation & Export**
-    * [cite_start]Compute evaluation metrics: Accuracy, Precision, Recall, and the Confusion Matrix[cite: 84, 85, 87, 89, 91].
-    * Save the trained model native Keras format: `model.save('emnist_model.keras')`.
-* **Step 1.3: TensorFlow.js Conversion**
-    * Install the conversion tool: `pip install tensorflowjs`.
-    * Convert the model to a web-friendly format via command line:
-        ```bash
-        tensorflowjs_converter --input_format=keras emnist_model.keras ./web_model
-        ```
-    * Output: This generates a `model.json` file (architecture) and one or more `.bin` files (sharded weights).
+---
 
-## Phase 2: Project Structure (Web Frontend)
-Organize your web repository as a static website. Since all processing runs on the client-side, no backend server is needed.
+## Project Structure
 
 ```text
-emnist-web-app/
+handwritten-character-recognition/
 │
-├── index.html          # UI Layout & Script CDNs
-├── style.css           # Styling for Canvas, Buttons, and Layout
-├── app.js              # Core Application Logic (Canvas, OpenCV.js, TF.js)
-└── model/              # Converted Model Assets
-    ├── model.json
-    └── group1-shard1of1.bin
-
+├── training/                    # Model training (Jupyter Notebook)
+│   ├── main.ipynb               # Full training pipeline + evaluation
+│   ├── requirements.txt         # Python dependencies
+│   └── .gitignore               # Ignores venv/, __pycache__/, *.keras, web_model/
+│
+├── web/                         # Static web application (deployed)
+│   ├── index.html               # UI layout & CDN imports
+│   ├── style.css                # Styling for canvas, buttons, layout
+│   ├── app.js                   # Core logic: Canvas, OpenCV.js, TF.js
+│   └── model/                   # Converted model assets
+│       ├── model.json           # TF.js model architecture
+│       └── group1-shard1of1.bin # Trained weights (binary)
+│
+├── docs/
+│   ├── development-plan.md      # This file
+│   └── (reports, diagrams)
+│
+├── .gitignore                   # Root gitignore
+└── README.md                    # Project overview + public access link
 ```
 
-## Phase 3: UI Design & Canvas Interactivity (HTML/CSS/JS)
+---
 
-Build the frontend user interface to capture handwritten input.
+## Phase 1: Model Training & Evaluation (Python)
 
-* **Step 3.1: HTML Framework (`index.html`)**
-* Add an HTML5 `<canvas>` element to act as the drawing surface.
+**Goal:** Train the CNN on EMNIST, evaluate performance, export for web use.
 
+### Step 1.1: Environment Setup
 
-* Add controls: a "Recognize Word" button and a "Clear Canvas" button.
-* Add an output display text element to present the reconstructed word.
+- Create and activate a Python virtual environment.
+- Install dependencies from `training/requirements.txt`.
+- Key libraries: `tensorflow`, `emnist`, `opencv-python`, `scikit-learn`, `matplotlib`, `numpy`.
 
+### Step 1.2: Load EMNIST Dataset
 
-* Import dependencies via CDN in the `<head>` or bottom of `<body>`:
-```html
-<script src="[https://cdn.jsdelivr.net/npm/@tensorflow/tfjs](https://cdn.jsdelivr.net/npm/@tensorflow/tfjs)"></script>
-<script src="[https://docs.opencv.org/4.x/opencv.js](https://docs.opencv.org/4.x/opencv.js)"></script>
+- Use the **`balanced`** split of the EMNIST dataset (47 classes).
+- The `emnist` Python library provides direct access.
+- Load training and test sets, reshape images to `(28, 28, 1)`, normalize pixel values to `[0, 1]` by dividing by 255.0.
+- Apply any necessary transposing/flipping to correct EMNIST image orientation.
+
+### Step 1.3: Implement the CNN Architecture (Sequential API)
+
+The model **must** follow this exact topology:
 
 ```
+Input: (28, 28, 1) — grayscale
 
+Block 1:
+  Conv2D(32, kernel=5x5, padding='same', activation='tanh')
+  MaxPooling2D(pool_size=2, strides=2)
 
+Block 2:
+  Conv2D(48, kernel=5x5, padding='same', activation='tanh')
+  MaxPooling2D(pool_size=2, strides=2)
 
+Block 3:
+  Conv2D(64, kernel=5x5, padding='same', activation='tanh')
 
-* **Step 3.2: Drawing Logic (`app.js`)**
-* Configure the canvas background to Black and the drawing stroke to White to match EMNIST dataset characteristics.
-* Implement event listeners (`mousedown`, `mousemove`, `mouseup` / `touchstart`, `touchmove`, `touchend`) to track and draw smooth lines on the canvas context.
+Flatten
 
+Dense(512, activation='tanh')
+Dense(84, activation='tanh')
+Dense(47, activation='softmax')
+```
 
+- Compile with an appropriate optimizer (e.g., `adam`) and `categorical_crossentropy` loss.
+- Train for a sufficient number of epochs with validation split.
 
-## Phase 4: Image Segmentation (OpenCV.js)
+### Step 1.4: Evaluation & Metrics
 
-Translate the Python OpenCV sequence given in the challenge instructions into JavaScript.
+After training, **mandatory** evaluation on the test set:
 
-* **Step 4.1: Convert Canvas to OpenCV Matrix**
-* `let src = cv.imread(canvasElement);`
+| Metric             | Tool                        |
+|--------------------|-----------------------------|
+| Accuracy           | `model.evaluate()`          |
+| Precision          | `sklearn.metrics.precision_score()` |
+| Recall             | `sklearn.metrics.recall_score()`    |
+| Confusion Matrix   | `sklearn.metrics.confusion_matrix()` |
 
+### Step 1.5: Theoretical Analysis (Report)
 
-* **Step 4.2: Pre-processing Pipeline**
-* Convert image to grayscale: `cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);`.
+Answer the following in the notebook (Markdown cells):
 
+1. **Which characters have the highest confusion index?**
+   - Analyze the confusion matrix to identify the most misclassified class pairs.
 
-* Apply Gaussian Blur to smooth noise: `cv.GaussianBlur(gray, blur, new cv.Size(5, 5), 0);`.
+2. **What theoretical hypotheses justify these classification difficulties?**
+   - Consider visual similarity between characters (e.g., 'l' vs '1', 'O' vs '0', 'I' vs 'l').
+   - Consider class imbalance in the EMNIST balanced split.
+   - Consider stroke variation and handwriting style differences.
 
+### Step 1.6: Model Export
 
-* Apply Inverted Otsu Thresholding: `cv.threshold(blur, thresh, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU);`.
+- Save in native Keras format: `model.save('emnist_model.keras')`.
+- Convert to TensorFlow.js format:
+  ```bash
+  pip install tensorflowjs
+  tensorflowjs_converter --input_format=keras emnist_model.keras ./web_model
+  ```
+- Output: `model.json` + `group1-shard1of1.bin` (or multiple shards).
+- Copy the `web_model/` contents into `web/model/` for deployment.
 
+---
 
+## Phase 2: Static Web Frontend
 
+**Goal:** Build the client-side application. No backend server required.
 
-* **Step 4.3: Contours & Spatial Sorting**
-* Find character contours: `cv.findContours(thresh, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);`.
+### Step 2.1: HTML Structure (`web/index.html`)
 
+- HTML5 `<canvas>` element as the drawing surface.
+- Controls: "Recognize Word" button, "Clear Canvas" button.
+- Output display element for the reconstructed word.
+- CDN imports in `<head>`:
+  ```html
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <script src="https://docs.opencv.org/4.x/opencv.js"></script>
+  ```
 
-* Loop through contours to extract Bounding Boxes `(x, y, w, h)`. Filter out micro-noise instances if needed.
+### Step 2.2: Styling (`web/style.css`)
 
+- Responsive layout.
+- Canvas styling (border, cursor, dimensions).
+- Button and output text styling.
 
-* Sort the bounding box objects from left to right using their `x` coordinate value (`boxes.sort((a, b) => a.x - b.x);`) to guarantee correct reading order.
+### Step 2.3: Drawing Logic (`web/app.js`)
 
+- Canvas background: **black**. Drawing stroke: **white** (matches EMNIST).
+- Event listeners for mouse: `mousedown`, `mousemove`, `mouseup`.
+- Event listeners for touch: `touchstart`, `touchmove`, `touchend`.
+- Smooth line drawing using canvas context (`lineWidth`, `lineCap`, `lineJoin`).
 
+---
 
+## Phase 3: Image Segmentation (OpenCV.js)
 
+**Goal:** Extract individual characters from the drawn word.
 
-## Phase 5: Model Integration & Client-Side Inference (TensorFlow.js)
+### Step 3.1: Canvas to OpenCV Matrix
 
-Load the converted neural network and run predictions iteratively for each segmented letter.
+```javascript
+let src = cv.imread(canvasElement);
+```
 
-* **Step 5.1: Model Loading**
-* Load the asynchronous model on window initialization:
+### Step 3.2: Pre-processing Pipeline
+
+1. Convert to grayscale:
+   ```javascript
+   cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+   ```
+2. Gaussian blur (5x5) for noise reduction:
+   ```javascript
+   cv.GaussianBlur(gray, blur, new cv.Size(5, 5), 0);
+   ```
+3. Inverted Otsu thresholding:
+   ```javascript
+   cv.threshold(blur, thresh, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU);
+   ```
+
+### Step 3.3: Contour Detection & Spatial Sorting
+
+1. Find external contours:
+   ```javascript
+   cv.findContours(thresh, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+   ```
+2. Extract bounding boxes `(x, y, w, h)` from each contour.
+3. Filter out noise (e.g., boxes smaller than a minimum area threshold).
+4. Sort boxes **left to right** by x-coordinate:
+   ```javascript
+   boxes.sort((a, b) => a.x - b.x);
+   ```
+
+---
+
+## Phase 4: Model Integration & Inference (TensorFlow.js)
+
+**Goal:** Run predictions on each segmented character.
+
+### Step 4.1: Load Model
+
 ```javascript
 const model = await tf.loadLayersModel('model/model.json');
-
 ```
 
+### Step 4.2: Character Extraction & Prediction Loop
 
+For each sorted bounding box:
 
+1. Crop the Region of Interest (ROI) from the thresholded image.
+2. Resize to **28x28** pixels (`cv.resize`).
+3. Convert OpenCV matrix to TensorFlow.js tensor (single channel).
+4. Normalize to `[0, 1]`: `tensor.toFloat().div(255.0)`.
+5. Reshape to 4D: `[1, 28, 28, 1]`.
+6. Run prediction:
+   ```javascript
+   const prediction = model.predict(tensor);
+   const classIndex = prediction.argMax(1).dataSync()[0];
+   ```
+7. Map the index to the 47-character EMNIST balanced class mapping.
 
-* **Step 5.2: Character Extraction & Pre-processing Loop**
-* Iterate through each sorted bounding box:
+### Step 4.3: Word Reconstruction
 
+- Append each predicted character to a string.
+- Display the final word in the output text element.
 
-* Crop the region of interest (ROI) from the threshold matrix using OpenCV.js.
+---
 
+## Phase 5: Testing & Validation
 
-* Resize the cropped character to exactly 28x28 pixels (`cv.resize`).
+**Goal:** Verify end-to-end functionality.
 
+### Step 5.1: Unit Testing
 
-* Convert the processed OpenCV region into a TensorFlow.js Tensor (ensure 1-channel grayscale output).
-* Normalize pixel intensities to a `[0, 1]` floating-point range: `tensor = tensor.toFloat().div(255.0);`.
+- Test canvas drawing and clearing.
+- Test OpenCV preprocessing pipeline (grayscale, blur, threshold, contours).
+- Test model loading and single-character prediction.
 
+### Step 5.2: Integration Testing
 
-* Reshape the tensor to fulfill the 4D input requirements `[1, 28, 28, 1]`.
+- Write complete words on the canvas and verify correct recognition.
+- Test edge cases: closely spaced letters, large gaps, varying stroke widths.
 
+### Step 5.3: Cross-browser Testing
 
+- Verify functionality on Chrome, Firefox, Safari.
+- Test touch input on mobile devices.
 
+---
 
+## Phase 6: Deployment
 
+**Goal:** Make the application publicly accessible.
 
-* **Step 5.3: Word Reconstruction**
-* Run prediction: `const prediction = model.predict(tensor);`.
+### Step 6.1: Repository Preparation
 
+- Ensure `web/model/` contains the converted TF.js model files.
+- Update `.gitignore` to exclude training artifacts (`venv/`, `__pycache__/`, `*.keras`, `training/web_model/`).
+- Write a clear `README.md` with project description and access link.
 
-* Obtain the highest probability index: `const classIndex = prediction.argMax(1).dataSync()[0];`.
+### Step 6.2: Deployment Options
 
+| Platform       | Type              | Notes                                      |
+|----------------|-------------------|---------------------------------------------|
+| GitHub Pages   | Static hosting    | Enable in repo Settings > Pages             |
+| Hugging Face   | Static HTML Space | Upload `web/` contents directly             |
 
-* Map the index to your 47-character string array mapping.
+### Step 6.3: Final Submission
 
+- Public URL accessible to the professor.
+- Notebook (`.ipynb`) with full training, evaluation, and theoretical analysis.
+- All code organized and documented.
 
-* Append each identified character sequentially to assemble the complete string and render it onto the screen.
+---
 
+## Checklist
 
-
-
-
-## Phase 6: Static Deploy
-
-Since this runtime model relies exclusively on front-end assets, hosting does not require complex Python virtual environments.
-
-* 
-**Hugging Face Spaces Option:** Create a new Space, choose Static HTML as your SDK type, and commit your static assets (`index.html`, `style.css`, `app.js`, and the `/model` directory) directly.
-
-
-* **Alternative Option (GitHub Pages):** Push the project repository onto GitHub and enable GitHub Pages under settings to instantly distribute a free public access URL.
-
+- [ ] EMNIST balanced dataset loaded (47 classes)
+- [ ] CNN architecture matches required topology exactly
+- [ ] Model trained with sufficient epochs
+- [ ] Accuracy, Precision, Recall computed
+- [ ] Confusion Matrix generated and analyzed
+- [ ] Theoretical questions answered in notebook
+- [ ] Model exported to TensorFlow.js format
+- [ ] Web frontend with canvas, buttons, output display
+- [ ] OpenCV.js segmentation pipeline working
+- [ ] TF.js model loads and predicts in browser
+- [ ] End-to-end word recognition tested
+- [ ] Deployed and public URL available
+- [ ] Repository clean with proper `.gitignore`
