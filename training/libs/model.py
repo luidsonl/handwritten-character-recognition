@@ -15,26 +15,27 @@ def build_model(
     input_shape: tuple[int, int, int] = (28, 28, 1),
     num_classes: int = 47,
 ) -> SequentialType:
+    s = SEED
     model = Sequential([
         Conv2D(32, (5, 5), padding='same', activation='tanh', input_shape=input_shape,
-               kernel_initializer=GlorotUniform(seed=SEED), bias_initializer=Zeros()),
+               kernel_initializer=GlorotUniform(seed=s), bias_initializer=Zeros()),
         MaxPooling2D(pool_size=2, strides=2),
 
         Conv2D(48, (5, 5), padding='same', activation='tanh',
-               kernel_initializer=GlorotUniform(seed=SEED), bias_initializer=Zeros()),
+               kernel_initializer=GlorotUniform(seed=s + 1), bias_initializer=Zeros()),
         MaxPooling2D(pool_size=2, strides=2),
 
         Conv2D(64, (5, 5), padding='same', activation='tanh',
-               kernel_initializer=GlorotUniform(seed=SEED), bias_initializer=Zeros()),
+               kernel_initializer=GlorotUniform(seed=s + 2), bias_initializer=Zeros()),
 
         Flatten(),
 
         Dense(512, activation='tanh',
-              kernel_initializer=GlorotUniform(seed=SEED), bias_initializer=Zeros()),
+              kernel_initializer=GlorotUniform(seed=s + 3), bias_initializer=Zeros()),
         Dense(84, activation='tanh',
-              kernel_initializer=GlorotUniform(seed=SEED), bias_initializer=Zeros()),
+              kernel_initializer=GlorotUniform(seed=s + 4), bias_initializer=Zeros()),
         Dense(num_classes, activation='softmax',
-              kernel_initializer=GlorotUniform(seed=SEED), bias_initializer=Zeros()),
+              kernel_initializer=GlorotUniform(seed=s + 5), bias_initializer=Zeros()),
     ])
     return model
 
@@ -125,6 +126,7 @@ def convert_to_tfjs(model: SequentialType, output_dir: str) -> None:
         'name': name,
         'shape': list(shape),
         'dtype': 'float32',
+        'paths': [shard_name],
     } for name, shape in weight_specs]]
 
     model_json = {
