@@ -12,7 +12,7 @@ export function useModel() {
 
     async function load() {
       try {
-        const m = await tf.loadLayersModel('/model/model.json');
+        const m = await tf.loadLayersModel(`${import.meta.env.BASE_URL}model/model.json`);
         if (!cancelled) {
           modelRef.current = m;
           setModel(m);
