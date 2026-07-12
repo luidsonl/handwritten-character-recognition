@@ -50,13 +50,17 @@ def _make_initializer(name: str, seed=None) -> dict:
 
 
 def _build_tfjs_topology(model: SequentialType) -> dict:
+    input_shape = list(model.input_shape[1:]) if hasattr(model, 'input_shape') else [28, 28, 1]
+
     layers = []
-    for layer in model.layers:
+    for i, layer in enumerate(model.layers):
         config = layer.get_config()
         layer_type = type(layer).__name__
         name = layer.name
 
         base = {'name': name, 'trainable': True, 'dtype': 'float32'}
+        if i == 0:
+            base['batchInputShape'] = [None, *input_shape]
 
         if layer_type == 'Conv2D':
             tfjs_config = {
@@ -112,8 +116,6 @@ def _build_tfjs_topology(model: SequentialType) -> dict:
 
         layers.append({'class_name': layer_type, 'config': tfjs_config})
 
-    input_shape = list(model.input_shape[1:]) if hasattr(model, 'input_shape') else [28, 28, 1]
-
     return {
         'keras_version': '3.12.3',
         'backend': 'tensorflow',
@@ -124,7 +126,6 @@ def _build_tfjs_topology(model: SequentialType) -> dict:
                 'trainable': True,
                 'dtype': 'float32',
                 'layers': layers,
-                'build_input_shape': [None, *input_shape],
             }
         }
     }
