@@ -40,53 +40,93 @@ def build_model(
     return model
 
 
+def _make_initializer(name: str, seed=None) -> dict:
+    return {
+        'module': 'keras.initializers',
+        'class_name': name,
+        'config': {'seed': seed},
+        'registered_name': None,
+    }
+
+
 def _build_tfjs_topology(model: SequentialType) -> dict:
     layers = []
     for layer in model.layers:
         config = layer.get_config()
         layer_type = type(layer).__name__
-        tfjs_config = {}
+        name = layer.name
+
+        base = {'name': name, 'trainable': True, 'dtype': 'float32'}
 
         if layer_type == 'Conv2D':
             tfjs_config = {
+                **base,
                 'filters': config['filters'],
                 'kernel_size': list(config['kernel_size']),
                 'strides': list(config['strides']),
-                'padding': config['padding'].upper(),
+                'padding': config['padding'].lower(),
                 'data_format': 'channels_last',
                 'dilation_rate': list(config.get('dilation_rate', (1, 1))),
                 'groups': config.get('groups', 1),
                 'activation': config['activation'] if isinstance(config['activation'], str) else config['activation'].__name__,
                 'use_bias': config['use_bias'],
-                'kernel_initializer': {'class_name': 'GlorotUniform', 'config': {'seed': None}},
-                'bias_initializer': {'class_name': 'Zeros', 'config': {}},
+                'kernel_initializer': _make_initializer('GlorotUniform'),
+                'bias_initializer': _make_initializer('Zeros'),
+                'kernel_regularizer': None,
+                'bias_regularizer': None,
+                'activity_regularizer': None,
+                'kernel_constraint': None,
+                'bias_constraint': None,
             }
 
         elif layer_type == 'MaxPooling2D':
             tfjs_config = {
+                **base,
                 'pool_size': list(config['pool_size']),
                 'strides': list(config['strides']),
-                'padding': config['padding'].upper(),
+                'padding': config['padding'].lower(),
                 'data_format': 'channels_last',
             }
 
         elif layer_type == 'Flatten':
-            tfjs_config = {'data_format': 'channels_last'}
+            tfjs_config = {
+                **base,
+                'data_format': 'channels_last',
+            }
 
         elif layer_type == 'Dense':
             tfjs_config = {
+                **base,
                 'units': config['units'],
                 'activation': config['activation'] if isinstance(config['activation'], str) else config['activation'].__name__,
                 'use_bias': config['use_bias'],
-                'kernel_initializer': {'class_name': 'GlorotUniform', 'config': {'seed': None}},
-                'bias_initializer': {'class_name': 'Zeros', 'config': {}},
+                'kernel_initializer': _make_initializer('GlorotUniform'),
+                'bias_initializer': _make_initializer('Zeros'),
+                'kernel_regularizer': None,
+                'bias_regularizer': None,
+                'kernel_constraint': None,
+                'bias_constraint': None,
             }
+        else:
+            continue
 
         layers.append({'class_name': layer_type, 'config': tfjs_config})
 
+    input_shape = list(model.input_shape[1:]) if hasattr(model, 'input_shape') else [28, 28, 1]
+
     return {
-        'class_name': 'Sequential',
-        'config': {'name': 'sequential', 'layers': layers},
+        'keras_version': '3.12.3',
+        'backend': 'tensorflow',
+        'model_config': {
+            'class_name': 'Sequential',
+            'config': {
+                'name': 'sequential',
+                'trainable': True,
+                'dtype': 'float32',
+                'layers': layers,
+                'build_input_shape': [None, *input_shape],
+            }
+        }
     }
 
 
@@ -122,12 +162,14 @@ def convert_to_tfjs(model: SequentialType, output_dir: str) -> None:
     with open(os.path.join(output_dir, shard_name), 'wb') as f:
         f.write(weights_data)
 
-    weights_manifest = [[{
-        'name': name,
-        'shape': list(shape),
-        'dtype': 'float32',
+    weights_manifest = [{
         'paths': [shard_name],
-    } for name, shape in weight_specs]]
+        'weights': [{
+            'name': name,
+            'shape': list(shape),
+            'dtype': 'float32',
+        } for name, shape in weight_specs],
+    }]
 
     model_json = {
         'format': 'layers-model',
