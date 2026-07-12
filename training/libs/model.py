@@ -5,7 +5,10 @@ import struct
 import numpy as np
 from keras.models import Sequential
 from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
+from keras.initializers import GlorotUniform, Zeros
 from keras.src.models.sequential import Sequential as SequentialType
+
+SEED = 42
 
 
 def build_model(
@@ -13,19 +16,25 @@ def build_model(
     num_classes: int = 47,
 ) -> SequentialType:
     model = Sequential([
-        Conv2D(32, (5, 5), padding='same', activation='tanh', input_shape=input_shape),
+        Conv2D(32, (5, 5), padding='same', activation='tanh', input_shape=input_shape,
+               kernel_initializer=GlorotUniform(seed=SEED), bias_initializer=Zeros()),
         MaxPooling2D(pool_size=2, strides=2),
 
-        Conv2D(48, (5, 5), padding='same', activation='tanh'),
+        Conv2D(48, (5, 5), padding='same', activation='tanh',
+               kernel_initializer=GlorotUniform(seed=SEED), bias_initializer=Zeros()),
         MaxPooling2D(pool_size=2, strides=2),
 
-        Conv2D(64, (5, 5), padding='same', activation='tanh'),
+        Conv2D(64, (5, 5), padding='same', activation='tanh',
+               kernel_initializer=GlorotUniform(seed=SEED), bias_initializer=Zeros()),
 
         Flatten(),
 
-        Dense(512, activation='tanh'),
-        Dense(84, activation='tanh'),
-        Dense(num_classes, activation='softmax'),
+        Dense(512, activation='tanh',
+              kernel_initializer=GlorotUniform(seed=SEED), bias_initializer=Zeros()),
+        Dense(84, activation='tanh',
+              kernel_initializer=GlorotUniform(seed=SEED), bias_initializer=Zeros()),
+        Dense(num_classes, activation='softmax',
+              kernel_initializer=GlorotUniform(seed=SEED), bias_initializer=Zeros()),
     ])
     return model
 

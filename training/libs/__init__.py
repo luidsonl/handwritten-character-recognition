@@ -9,6 +9,8 @@ from .data_loader import (
 
 from .model import build_model, convert_to_tfjs
 
+from .seeds import set_seeds
+
 from .trainer import (
     compile_model,
     train_model,
