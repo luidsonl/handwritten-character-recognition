@@ -7,7 +7,7 @@ from .data_loader import (
     NUM_CLASSES,
 )
 
-from .model import build_model
+from .model import build_model, convert_to_tfjs
 
 from .trainer import (
     compile_model,
