@@ -1,0 +1,11 @@
+training/venv/
+training/__pycache__/
+training/**/__pycache__/
+training/*.pyc
+training/data/
+training/web_model/
+training/*.keras
+
+web/node_modules/
+web/dist/
+web/.vite/
