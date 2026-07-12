@@ -2,6 +2,8 @@
 
 Sistema de reconhecimento de caracteres manuscritos utilizando Rede Neural Convolucional (CNN) treinada sobre o dataset EMNIST, com interface web para predição em tempo real.
 
+![Captura de tela](./docs/print.png)
+
 ---
 
 ## Treinamento
